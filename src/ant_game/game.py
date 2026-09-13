@@ -3,7 +3,42 @@ import math
 from typing import Literal
 
 
+type Block = tuple[int, int]
+
+
 _PG_LMB = 1
+
+
+class Ant:
+    x: int
+    y: int
+    _direction: Literal[0, 1, 2, 3] = 0
+    color: int
+    
+    def __init__(self, x: int = 0, y: int = 0, color: int = 0xc070ff) -> None:
+        self.x = x
+        self.y = y
+        self.color = color
+    
+    def turn_right(self) -> None:
+        self._direction = (self._direction + 1) % 4
+    
+    def turn_left(self) -> None:
+        self._direction = (self._direction + 3) % 4
+    
+    def move_forward(self) -> None:
+        if (self._direction == 0):
+            self.y += 1
+        elif (self._direction == 1):
+            self.x += 1
+        elif (self._direction == 2):
+            self.y -= 1
+        else:
+            self.x -= 1
+    
+    def get_pos(self) -> tuple[int, int]:
+        return (self.x, self.y)
+
 
 class AntGame:
     _window_width: int
@@ -24,15 +59,10 @@ class AntGame:
     _background_color: int
     _grid_line_color: int
     _on_block_color: int
-    _ant_color: int
     
-    # (x, y)
-    _ant_pos: list[int, int] = [0, 0]
-    _ant_direction: Literal[0, 1, 2, 3] = 0 # Up, Right, Down, Left
+    _camera_offset: list[int]
     
-    _camera_offset: list[int, int]
-    
-    _on_blocks: set[tuple[int, int]] = set()
+    _on_blocks: set[Block] = set()
     
     _min_x_block: int
     _max_x_block: int
@@ -40,6 +70,7 @@ class AntGame:
     _max_y_block: int
     
     _zoom_factor: float = 1.1
+    _ant: Ant
     
     def __init__(
         self,
@@ -67,7 +98,7 @@ class AntGame:
         
         self._grid_line_color = grid_line_color
         
-        self._ant_color = ant_color
+        self._ant = Ant(color=ant_color)
         
         self._camera_offset = [
             -int(self._window_width / 2 - self._block_size / 2),
@@ -145,17 +176,17 @@ class AntGame:
     def _draw_ant(self) -> None:
         pygame.draw.rect(
             self._screen,
-            self._ant_color,
+            self._ant.color,
             (
-                self._ant_pos[0] * self._block_size - self._camera_offset[0],
-                self._ant_pos[1] * self._block_size - self._camera_offset[1],
+                self._ant.x * self._block_size - self._camera_offset[0],
+                self._ant.y * self._block_size - self._camera_offset[1],
                 math.ceil(self._block_size),
                 math.ceil(self._block_size)
             )
         )
     
     
-    def _is_on(self, xy: tuple[int, int]) -> bool:
+    def _is_on(self, xy: Block) -> bool:
         return xy in self._on_blocks
     
     
@@ -168,32 +199,21 @@ class AntGame:
                     pygame.draw.rect(self._screen, self._on_block_color, (x, y, math.ceil(self._block_size), math.ceil(self._block_size)))
     
     
-    def _invert_block(self, xy: tuple[int, int]) -> None:
+    def _invert_block(self, xy: Block) -> None:
         if self._is_on(xy):
             self._on_blocks.remove(xy)
         else:
             self._on_blocks.add(xy)
-
-    
-    def _ant_forward(self):
-        if (self._ant_direction == 0):
-            self._ant_pos[1] += 1
-        elif (self._ant_direction == 1):
-            self._ant_pos[0] += 1
-        elif (self._ant_direction == 2):
-            self._ant_pos[1] -= 1
-        else:
-            self._ant_pos[0] -= 1
     
     
     def _ant_step(self):
-        if self._is_on(tuple(self._ant_pos)):
-            self._ant_direction = (self._ant_direction + 1) % 4
+        if self._is_on(self._ant.get_pos()):
+            self._ant.turn_right()
         else:
-            self._ant_direction = (self._ant_direction + 3) % 4
+            self._ant.turn_left()
         
-        self._invert_block(tuple(self._ant_pos))
-        self._ant_forward()
+        self._invert_block(self._ant.get_pos())
+        self._ant.move_forward()
     
     
     def run(self) -> None:
