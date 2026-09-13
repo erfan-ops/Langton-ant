@@ -54,7 +54,7 @@ class AntGame:
     
     _running: bool = True
     
-    _fps: float = 240
+    _fps: float = 60
     
     _background_color: int
     _grid_line_color: int
@@ -71,6 +71,9 @@ class AntGame:
     
     _zoom_factor: float = 1.1
     _ant: Ant
+    
+    # _mode = "LLRRRLRLRLLR"
+    # _colors = (0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0x00ffff, 0xffffff, 0x9000ff, 0x7f7f7f, 0x402000, 0xc070ff, 0x008000)
     
     def __init__(
         self,
@@ -105,28 +108,32 @@ class AntGame:
             -int(self._window_height / 2 - self._block_size / 2)
         ]
         
-        self._min_x_block = int(self._camera_offset[0])
-        self._max_x_block = int(self._camera_offset[0] + self._window_width) + 1
-        
-        self._min_y_block = int(self._camera_offset[1])
-        self._max_y_block = int(self._camera_offset[1] + self._window_height) + 1
+        self._update_drawing_region()
 
         self._on_block_color = on_block_color
     
     
-    def _update_block_size(self, new_size: float):
+    def _update_block_size(self, new_size: float) -> None:
         self._block_size = new_size
         self._blocks_in_width = self._window_width / self._block_size
         self._blocks_in_height = self._window_height / self._block_size
     
     
-    def _zoom_in(self, zoom: float):
+    def _zoom_in(self, zoom: float) -> None:
         zoom_amount = self._zoom_factor ** zoom
         self._update_block_size(self._block_size * zoom_amount)
     
-    def _zoom_out(self, zoom: float):
+    def _zoom_out(self, zoom: float) -> None:
         zoom_amount = self._zoom_factor ** zoom
         self._update_block_size(self._block_size / zoom_amount)
+    
+    
+    def _update_drawing_region(self) -> None:
+        self._min_x_block = int(math.floor(self._camera_offset[0] / self._block_size))
+        self._max_x_block = int(math.ceil(self._min_x_block + self._blocks_in_width)) + 1
+        
+        self._min_y_block = int(math.floor(self._camera_offset[1] / self._block_size))
+        self._max_y_block = int(math.ceil(self._min_y_block + self._blocks_in_height)) + 1
     
     
     def _handle_events(self) -> None:
@@ -148,17 +155,15 @@ class AntGame:
                     self._camera_offset[0] -= event.rel[0]
                     self._camera_offset[1] -= event.rel[1]
                     
-                    self._min_x_block = int(self._camera_offset[0])
-                    self._max_x_block = int(self._camera_offset[0] + self._window_width) + 1
-                    
-                    self._min_y_block = int(self._camera_offset[1])
-                    self._max_y_block = int(self._camera_offset[1] + self._window_height) + 1
+                    self._update_drawing_region()
+            
             elif event.type == pygame.MOUSEWHEEL:
                 scroll_value = event.precise_y
                 if scroll_value > 0:
                     self._zoom_in(scroll_value)
                 else:
                     self._zoom_out(abs(scroll_value))
+                self._update_drawing_region()
 
 
     def _draw_grid_lines(self) -> None:
