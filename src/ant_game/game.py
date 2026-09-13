@@ -48,11 +48,11 @@ class AntGame:
     _block_size: int
     
     _screen: pygame.surface.Surface
-    _clock: pygame.time._clock
+    _clock: pygame.time.Clock
     
     _running: bool = True
     
-    _fps: float = 240
+    _fps: float = 120
     
     _grid_line_color: Color
     
@@ -73,6 +73,8 @@ class AntGame:
     
     _block_stages: dict[tuple[int, int], int] = {}
     
+    _step_interval: float
+    
     def __init__(
         self,
         width: int = 600,
@@ -81,7 +83,8 @@ class AntGame:
         grid_line_color: Color = 0xaba9ad,
         ant_color: Color = 0xffffff,
         colors: list[Color] = [0x262428, 0xfdfbff],
-        mode: str = "LR"
+        mode: str = "LR",
+        step_interval: float = 16
     ) -> None:
         pygame.init()
         
@@ -107,6 +110,8 @@ class AntGame:
         self._colors = colors if len(colors) >= 2 else [0x262428, 0xfdfbff] # use defualt colors if colors are invalid
         
         self._mode = mode
+        
+        self._step_interval = step_interval
         
         self._update_drawing_region()
     
@@ -273,7 +278,11 @@ class AntGame:
     
     
     def run(self) -> None:
+        then = pygame.time.get_ticks()
         while self._running:
+            now = pygame.time.get_ticks()
+            
+            
             self._handle_events()
             
             # fill the background
@@ -283,7 +292,13 @@ class AntGame:
             self._draw_ant()
             # self._draw_grid_lines()
             
-            self._ant_step()
+            step_diff = now - then
+            if step_diff > self._step_interval:
+                number_of_steps = int(step_diff / self._step_interval)
+                for _ in range(number_of_steps):
+                    self._ant_step()
+                
+                then += self._step_interval * number_of_steps
             
             
             pygame.display.flip()
