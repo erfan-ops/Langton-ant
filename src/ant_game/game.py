@@ -1,51 +1,21 @@
-import pygame
 import math
-from typing import Literal
 
+import pygame
+
+from .ant import Ant
 
 type Block = tuple[int, int]
 type Color = int
 
 
-class Ant:
-    x: int
-    y: int
-    _direction: Literal[0, 1, 2, 3] = 0 # UP, RIGHT, DOWN, LEFT
-    color: Color
-    
-    def __init__(self, x: int = 0, y: int = 0, color: Color = 0xc070ff) -> None:
-        self.x = x
-        self.y = y
-        self.color = color
-    
-    def turn_right(self) -> None:
-        self._direction = (self._direction + 1) % 4
-    
-    def turn_left(self) -> None:
-        self._direction = (self._direction + 3) % 4
-    
-    def move_forward(self) -> None:
-        if (self._direction == 0):
-            self.y -= 1
-        elif (self._direction == 1):
-            self.x += 1
-        elif (self._direction == 2):
-            self.y += 1
-        else:
-            self.x -= 1
-    
-    def get_pos(self) -> tuple[int, int]:
-        return (self.x, self.y)
-
-
-class AntGame:
+class Game:
     _window_width: int
     _window_height: int
     
     _blocks_in_width: float
     _blocks_in_height: float
     
-    _block_size: int
+    _block_size: float
     
     _screen: pygame.surface.Surface
     _clock: pygame.time.Clock
@@ -56,9 +26,9 @@ class AntGame:
     
     _grid_line_color: Color
     
-    _camera_offset: list[int]
+    _camera_offset: list[float]
     
-    _on_blocks: set[Block] = set()
+    _on_blocks: set[Block]
     
     _min_x_block: int
     _max_x_block: int
@@ -71,7 +41,7 @@ class AntGame:
     _mode: str
     _colors: list[Color]
     
-    _block_stages: dict[tuple[int, int], int] = {}
+    _block_stages: dict[tuple[int, int], int]
     
     _step_interval: float
     
@@ -84,7 +54,7 @@ class AntGame:
         pixel_size: int = 20,
         grid_line_color: Color = 0xaba9ad,
         ant_color: Color = 0xffffff,
-        colors: list[Color] = [0x262428, 0xfdfbff],
+        colors: list[Color] | None = None,
         mode: str = "LR",
         step_interval: float = 16
     ) -> None:
@@ -109,11 +79,15 @@ class AntGame:
             -int(self._window_height / 2 - self._block_size / 2)
         ]
         
-        self._colors = colors if len(colors) >= 2 else [0x262428, 0xfdfbff] # use defualt colors if colors are invalid
+        self._colors = [0x262428, 0xfdfbff] if (colors is None or len(colors) < 2) else colors # use defualt colors if colors are invalid
         
         self._mode = mode
         
         self._step_interval = step_interval
+        
+        self._block_stages = {}
+        
+        self._on_blocks = set()
         
         self._update_drawing_region()
     
@@ -134,14 +108,14 @@ class AntGame:
 
         self._camera_offset[0] = world_x * self._block_size - mouse_x
         self._camera_offset[1] = world_y * self._block_size - mouse_y
-    
-    
+
+
     def _update_drawing_region(self) -> None:
-        self._min_x_block = int(math.floor(self._camera_offset[0] / self._block_size))
-        self._max_x_block = int(math.ceil(self._min_x_block + self._blocks_in_width)) + 1
+        self._min_x_block = math.floor(self._camera_offset[0] / self._block_size)
+        self._max_x_block = math.ceil(self._min_x_block + self._blocks_in_width) + 1
         
-        self._min_y_block = int(math.floor(self._camera_offset[1] / self._block_size))
-        self._max_y_block = int(math.ceil(self._min_y_block + self._blocks_in_height)) + 1
+        self._min_y_block = math.floor(self._camera_offset[1] / self._block_size)
+        self._max_y_block = math.ceil(self._min_y_block + self._blocks_in_height) + 1
     
     
     def _reset(self):

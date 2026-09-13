@@ -1,8 +1,7 @@
 import ant_game
 
-
 if __name__ == "__main__":
-    game = ant_game.AntGame(
+    game = ant_game.Game(
         pixel_size=20,
         width=1600,
         height=900,
