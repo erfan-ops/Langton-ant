@@ -4,18 +4,16 @@ from typing import Literal
 
 
 type Block = tuple[int, int]
-
-
-_PG_LMB = 1
+type Color = int
 
 
 class Ant:
     x: int
     y: int
-    _direction: Literal[0, 1, 2, 3] = 0
-    color: int
+    _direction: Literal[0, 1, 2, 3] = 0 # UP, RIGHT, DOWN, LEFT
+    color: Color
     
-    def __init__(self, x: int = 0, y: int = 0, color: int = 0xc070ff) -> None:
+    def __init__(self, x: int = 0, y: int = 0, color: Color = 0xc070ff) -> None:
         self.x = x
         self.y = y
         self.color = color
@@ -28,11 +26,11 @@ class Ant:
     
     def move_forward(self) -> None:
         if (self._direction == 0):
-            self.y += 1
+            self.y -= 1
         elif (self._direction == 1):
             self.x += 1
         elif (self._direction == 2):
-            self.y -= 1
+            self.y += 1
         else:
             self.x -= 1
     
@@ -54,11 +52,9 @@ class AntGame:
     
     _running: bool = True
     
-    _fps: float = 60
+    _fps: float = 240
     
-    _background_color: int
-    _grid_line_color: int
-    _on_block_color: int
+    _grid_line_color: Color
     
     _camera_offset: list[int]
     
@@ -72,18 +68,20 @@ class AntGame:
     _zoom_factor: float = 1.1
     _ant: Ant
     
-    # _mode = "LLRRRLRLRLLR"
-    # _colors = (0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00, 0x00ffff, 0xffffff, 0x9000ff, 0x7f7f7f, 0x402000, 0xc070ff, 0x008000)
+    _mode: str
+    _colors: list[Color]
+    
+    _block_stages: dict[tuple[int, int], int] = {}
     
     def __init__(
         self,
         width: int = 600,
         height: int = 600,
         pixel_size: int = 20,
-        grid_line_color: int = 0xaba9ad,
-        background_color: int = 0x0e0c10,
-        ant_color: int = 0xffffff,
-        on_block_color: int = 0xffffd0
+        grid_line_color: Color = 0xaba9ad,
+        ant_color: Color = 0xffffff,
+        colors: list[Color] = [0x262428, 0xfdfbff],
+        mode: str = "LR"
     ) -> None:
         pygame.init()
         
@@ -97,8 +95,6 @@ class AntGame:
         self._screen = pygame.display.set_mode((self._window_width, self._window_height))
         self._clock = pygame.time.Clock()
         
-        self._background_color = background_color
-        
         self._grid_line_color = grid_line_color
         
         self._ant = Ant(color=ant_color)
@@ -108,9 +104,11 @@ class AntGame:
             -int(self._window_height / 2 - self._block_size / 2)
         ]
         
+        self._colors = colors if len(colors) >= 2 else [0x262428, 0xfdfbff] # use defualt colors if colors are invalid
+        
+        self._mode = mode
+        
         self._update_drawing_region()
-
-        self._on_block_color = on_block_color
     
     
     def _update_block_size(self, new_size: float) -> None:
@@ -195,29 +193,82 @@ class AntGame:
         return xy in self._on_blocks
     
     
+    def _extract_rgb(self, color: Color) -> tuple[int, int, int]:
+        b = color & 0xff
+        g = (color >> 8) & 0xff
+        r = (color >> 16) & 0xff
+        
+        return (r, g, b)
+    
+    
+    def _interpolate_color(self, stage: int) -> Color:
+        if len(self._mode) == 2:
+            return self._colors[-1]
+        
+        t = (stage+1) / (len(self._mode)-1)
+        
+        if t <= 0:
+            return self._colors[0]
+        elif t >= 1:
+            return self._colors[-1]
+        
+        scaled = t * (len(self._colors)-1);
+        index = int(scaled);
+        local_t = scaled - index;
+        
+        c1 = self._colors[index]
+        c2 = self._colors[index + 1]
+        
+        r1, g1, b1 = self._extract_rgb(c1)
+        r2, g2, b2 = self._extract_rgb(c2)
+        
+        
+        # r1*(1-t) + r2*(t)
+        # r1 - r1t + r2t
+        # r1 + r2t - r1t
+        # r1 + t(r2 - r1)
+        
+        r_out = int((r2 - r1) * local_t + r1)
+        g_out = int((g2 - g1) * local_t + g1)
+        b_out = int((b2 - b1) * local_t + b1)
+        
+        return (r_out << 16) + (g_out << 8) + b_out
+
+    
     def _draw_blocks(self) -> None:
         for x_block in range(self._min_x_block, self._max_x_block):
             for y_block in range(self._min_y_block, self._max_y_block):
                 if self._is_on((x_block, y_block)):
                     x = x_block * self._block_size - self._camera_offset[0]
                     y = y_block * self._block_size - self._camera_offset[1]
-                    pygame.draw.rect(self._screen, self._on_block_color, (x, y, math.ceil(self._block_size), math.ceil(self._block_size)))
+                    stage = self._block_stages[(x_block, y_block)]
+                    color = self._interpolate_color(stage)
+                    pygame.draw.rect(self._screen, color, (x, y, math.ceil(self._block_size), math.ceil(self._block_size)))
     
     
-    def _invert_block(self, xy: Block) -> None:
-        if self._is_on(xy):
+    def _update_block(self, xy: Block) -> None:
+        if self._is_on(xy) and self._block_stages[xy] < len(self._mode)-2:
+            self._block_stages[xy] = self._block_stages[xy] + 1
+        elif self._is_on(xy):
             self._on_blocks.remove(xy)
+            self._block_stages.pop(xy)
         else:
             self._on_blocks.add(xy)
+            self._block_stages[xy] = 0
     
     
     def _ant_step(self):
-        if self._is_on(self._ant.get_pos()):
+        if not self._is_on(self._ant.get_pos()):
+            mode_index = 0
+        else:
+            mode_index = self._block_stages[self._ant.get_pos()] + 1
+        
+        if self._mode[mode_index] == 'R':
             self._ant.turn_right()
         else:
             self._ant.turn_left()
         
-        self._invert_block(self._ant.get_pos())
+        self._update_block(self._ant.get_pos())
         self._ant.move_forward()
     
     
@@ -226,7 +277,7 @@ class AntGame:
             self._handle_events()
             
             # fill the background
-            self._screen.fill(self._background_color)
+            self._screen.fill(self._colors[0])
             
             self._draw_blocks()
             self._draw_ant()
