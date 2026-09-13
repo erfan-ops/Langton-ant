@@ -8,8 +8,8 @@ if __name__ == "__main__":
         height=900,
         grid_line_color=0,
         ant_color=0xc070ff,
-        mode="RRLLLRLLLRRR",
+        mode="RL",
         colors=[0x14012a, 0x542809, 0xffe999],
-        step_interval=5
+        step_interval=100
     )
     game.run()
