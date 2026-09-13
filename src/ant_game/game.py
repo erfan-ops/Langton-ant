@@ -75,6 +75,8 @@ class AntGame:
     
     _step_interval: float
     
+    _paused: bool = True
+    
     def __init__(
         self,
         width: int = 600,
@@ -139,6 +141,18 @@ class AntGame:
         self._max_y_block = int(math.ceil(self._min_y_block + self._blocks_in_height)) + 1
     
     
+    def _reset(self):
+        self._ant = Ant(color=self._ant.color)
+        self._on_blocks.clear()
+        self._block_stages.clear()
+        self._paused = True
+        
+        self._camera_offset = [
+            -int(self._window_width / 2 - self._block_size / 2),
+            -int(self._window_height / 2 - self._block_size / 2)
+        ]
+    
+    
     def _handle_events(self) -> None:
         for event in pygame.event.get():
             # Window events
@@ -147,8 +161,19 @@ class AntGame:
             
             # Keyboard events
             elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_n and self._paused:
+                    self._paused = False
+            elif event.type == pygame.KEYUP:
                 if event.key == pygame.K_ESCAPE:
                     self._running = False
+                elif event.key == pygame.K_SPACE:
+                    self._paused = not self._paused
+                elif event.key == pygame.K_n:
+                    self._paused = True
+                elif event.key == pygame.K_RIGHT:
+                    self._ant_step()
+                elif event.key == pygame.K_r:
+                    self._reset()
             
             # Mouse events
             elif event.type == pygame.MOUSEMOTION:
@@ -282,7 +307,6 @@ class AntGame:
         while self._running:
             now = pygame.time.get_ticks()
             
-            
             self._handle_events()
             
             # fill the background
@@ -292,13 +316,16 @@ class AntGame:
             self._draw_ant()
             # self._draw_grid_lines()
             
-            step_diff = now - then
-            if step_diff > self._step_interval:
-                number_of_steps = int(step_diff / self._step_interval)
-                for _ in range(number_of_steps):
-                    self._ant_step()
-                
-                then += self._step_interval * number_of_steps
+            if self._paused:
+                then = now
+            else:
+                step_diff = now - then
+                if step_diff > self._step_interval:
+                    number_of_steps = int(step_diff / self._step_interval)
+                    for _ in range(number_of_steps):
+                        self._ant_step()
+                    
+                    then += self._step_interval * number_of_steps
             
             
             pygame.display.flip()
