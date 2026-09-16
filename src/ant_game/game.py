@@ -47,6 +47,11 @@ class Game:
     
     _paused: bool = True
     
+    _right_most_block_x: int
+    _left_most_block_x: int
+    _top_most_block_y: int
+    _bottom_most_block_y: int
+    
     def __init__(
         self,
         width: int = 600,
@@ -73,6 +78,11 @@ class Game:
         self._grid_line_color = grid_line_color
         
         self._ant = Ant(color=ant_color)
+        
+        self._right_most_block_x = self._ant.x
+        self._left_most_block_x = self._ant.x
+        self._top_most_block_y = self._ant.y
+        self._bottom_most_block_y = self._ant.y
         
         self._camera_offset = [
             -int(self._window_width / 2 - self._block_size / 2),
@@ -111,15 +121,21 @@ class Game:
 
 
     def _update_drawing_region(self) -> None:
-        self._min_x_block = math.floor(self._camera_offset[0] / self._block_size)
-        self._max_x_block = math.ceil(self._min_x_block + self._blocks_in_width) + 1
+        self._min_x_block = max(math.floor(self._camera_offset[0] / self._block_size), self._left_most_block_x)
+        self._max_x_block = min(math.ceil(self._min_x_block + self._blocks_in_width), self._right_most_block_x) + 1
         
-        self._min_y_block = math.floor(self._camera_offset[1] / self._block_size)
-        self._max_y_block = math.ceil(self._min_y_block + self._blocks_in_height) + 1
+        self._min_y_block = max(math.floor(self._camera_offset[1] / self._block_size), self._top_most_block_y)
+        self._max_y_block = min(math.ceil(self._min_y_block + self._blocks_in_height), self._bottom_most_block_y) + 1
     
     
     def _reset(self):
         self._ant = Ant(color=self._ant.color)
+        
+        self._right_most_block_x = self._ant.x
+        self._left_most_block_x = self._ant.x
+        self._top_most_block_y = self._ant.y
+        self._bottom_most_block_y = self._ant.y
+
         self._on_blocks.clear()
         self._block_stages.clear()
         self._paused = True
@@ -128,6 +144,8 @@ class Game:
             -int(self._window_width / 2 - self._block_size / 2),
             -int(self._window_height / 2 - self._block_size / 2)
         ]
+        
+        self._update_drawing_region()
     
     
     def _handle_events(self) -> None:
@@ -255,14 +273,40 @@ class Game:
     
     
     def _update_block(self, xy: Block) -> None:
-        if self._is_on(xy) and self._block_stages[xy] < len(self._mode)-2:
-            self._block_stages[xy] = self._block_stages[xy] + 1
-        elif self._is_on(xy):
-            self._on_blocks.remove(xy)
-            self._block_stages.pop(xy)
+        is_on = self._is_on(xy)
+
+        if is_on:
+            if self._block_stages[xy] < len(self._mode) - 2:
+                self._block_stages[xy] += 1
+            else:
+                self._on_blocks.remove(xy)
+                self._block_stages.pop(xy)
+                return
         else:
             self._on_blocks.add(xy)
             self._block_stages[xy] = 0
+
+        x, y = xy
+        bounds_changed = False
+
+        if x < self._left_most_block_x:
+            self._left_most_block_x = x
+            bounds_changed = True
+
+        if x > self._right_most_block_x:
+            self._right_most_block_x = x
+            bounds_changed = True
+
+        if y < self._top_most_block_y:
+            self._top_most_block_y = y
+            bounds_changed = True
+
+        if y > self._bottom_most_block_y:
+            self._bottom_most_block_y = y
+            bounds_changed = True
+
+        if bounds_changed:
+            self._update_drawing_region()
     
     
     def _ant_step(self):
